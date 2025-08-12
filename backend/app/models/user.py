@@ -19,6 +19,7 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user")
     subscriptions = relationship("Subscription", back_populates="user")
     usage_counters = relationship("UsageCounter", back_populates="user")
+    settings = relationship("UserSettings", back_populates="user", uselist=False)
 
 
 class RefreshToken(Base):
@@ -86,3 +87,30 @@ class UsageCounter(Base):
 
     # Relationships
     user = relationship("User", back_populates="usage_counters")
+
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    
+    # Notification settings
+    email_notifications = Column(Boolean, default=True)
+    push_notifications = Column(Boolean, default=True)
+    marketing_emails = Column(Boolean, default=False)
+    
+    # Privacy settings
+    profile_visibility = Column(String, default="public")
+    show_activity = Column(Boolean, default=True)
+    
+    # Preferences
+    language = Column(String, default="en")
+    theme = Column(String, default="light")
+    timezone = Column(String, default="UTC")
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="settings")

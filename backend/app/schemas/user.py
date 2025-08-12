@@ -97,3 +97,35 @@ class SystemUsageStats(BaseModel):
     total_requests_month: int
     users_by_plan: dict
     revenue_month: float
+
+
+class UserNotificationSettings(BaseModel):
+    email_notifications: bool = True
+    push_notifications: bool = True
+    marketing_emails: bool = False
+
+
+class UserPrivacySettings(BaseModel):
+    profile_visibility: str = "public"
+    show_activity: bool = True
+
+
+class UserPreferences(BaseModel):
+    language: str = "en"
+    theme: str = "light"
+    timezone: str = "UTC"
+
+
+class UserSettings(BaseModel):
+    notifications: UserNotificationSettings
+    privacy: UserPrivacySettings
+    preferences: UserPreferences
+
+
+class UserSettingsResponse(BaseModel):
+    notifications: UserNotificationSettings
+    privacy: UserPrivacySettings
+    preferences: UserPreferences
+
+    class Config:
+        from_attributes = True

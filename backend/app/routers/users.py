@@ -6,7 +6,8 @@ from app.core.database import get_db
 from app.core.auth import get_current_active_user
 from app.schemas.user import (
     UserProfileUpdate, UserDeactivateRequest, PlanResponse,
-    SubscribeRequest, SubscriptionResponse, UsageStatsResponse
+    SubscribeRequest, SubscriptionResponse, UsageStatsResponse,
+    UserSettings, UserSettingsResponse
 )
 from app.schemas.auth import UserResponse
 from app.services.user_service import UserService
@@ -205,3 +206,130 @@ async def cancel_my_subscription(
     db.commit()
     
     return {"message": "Subscription cancelled successfully"}
+
+
+@router.get("/settings", response_model=UserSettingsResponse)
+async def get_my_settings(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current user's settings."""
+    from app.models.user import UserSettings as UserSettingsModel
+    
+    user_settings = db.query(UserSettingsModel).filter(
+        UserSettingsModel.user_id == current_user.id
+    ).first()
+    
+    if not user_settings:
+        # Create default settings if not exists
+        user_settings = UserSettingsModel(
+            user_id=current_user.id,
+            email_notifications=True,
+            push_notifications=True,
+            marketing_emails=False,
+            profile_visibility="public",
+            show_activity=True,
+            language="en",
+            theme="light",
+            timezone="UTC"
+        )
+        db.add(user_settings)
+        db.commit()
+        db.refresh(user_settings)
+    
+    return {
+        "notifications": {
+            "email_notifications": user_settings.email_notifications,
+            "push_notifications": user_settings.push_notifications,
+            "marketing_emails": user_settings.marketing_emails,
+        },
+        "privacy": {
+            "profile_visibility": user_settings.profile_visibility,
+            "show_activity": user_settings.show_activity,
+        },
+        "preferences": {
+            "language": user_settings.language,
+            "theme": user_settings.theme,
+            "timezone": user_settings.timezone,
+        }
+    }
+
+
+@router.put("/settings")
+async def update_my_settings(
+    settings: UserSettings,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update current user's settings."""
+    from app.models.user import UserSettings as UserSettingsModel
+    
+    user_settings = db.query(UserSettingsModel).filter(
+        UserSettingsModel.user_id == current_user.id
+    ).first()
+    
+    if not user_settings:
+        # Create new settings if not exists
+        user_settings = UserSettingsModel(
+            user_id=current_user.id,
+            email_notifications=settings.notifications.email_notifications,
+            push_notifications=settings.notifications.push_notifications,
+            marketing_emails=settings.notifications.marketing_emails,
+            profile_visibility=settings.privacy.profile_visibility,
+            show_activity=settings.privacy.show_activity,
+            language=settings.preferences.language,
+            theme=settings.preferences.theme,
+            timezone=settings.preferences.timezone
+        )
+        db.add(user_settings)
+    else:
+        # Update existing settings
+        user_settings.email_notifications = settings.notifications.email_notifications
+        user_settings.push_notifications = settings.notifications.push_notifications
+        user_settings.marketing_emails = settings.notifications.marketing_emails
+        user_settings.profile_visibility = settings.privacy.profile_visibility
+        user_settings.show_activity = settings.privacy.show_activity
+        user_settings.language = settings.preferences.language
+        user_settings.theme = settings.preferences.theme
+        user_settings.timezone = settings.preferences.timezone
+    
+    db.commit()
+    return {"message": "Settings updated successfully"}
+
+
+@router.delete("/me")
+async def delete_my_account(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Delete current user's account."""
+    from app.models.user import UserSettings as UserSettingsModel
+    
+    # Delete user's settings first
+    db.query(UserSettingsModel).filter(
+        UserSettingsModel.user_id == current_user.id
+    ).delete()
+    
+    # Delete user's refresh tokens
+    from app.models.user import RefreshToken
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == current_user.id
+    ).delete()
+    
+    # Delete user's subscriptions
+    from app.models.user import Subscription
+    db.query(Subscription).filter(
+        Subscription.user_id == current_user.id
+    ).delete()
+    
+    # Delete user's usage counters
+    from app.models.user import UsageCounter
+    db.query(UsageCounter).filter(
+        UsageCounter.user_id == current_user.id
+    ).delete()
+    
+    # Finally delete the user
+    db.delete(current_user)
+    db.commit()
+    
+    return {"message": "Account deleted successfully"}
