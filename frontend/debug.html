@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Dashboard Data</title>
+</head>
+<body>
+    <h1>Debug Dashboard Data</h1>
+    <button onclick="testAPIs()">Test APIs</button>
+    <button onclick="login()">Login as Admin</button>
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let token = null;
+
+        async function login() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                const data = await response.json();
+                token = data.access_token;
+                document.getElementById('results').innerHTML += '<p>✅ Login successful! Token: ' + token.substring(0, 50) + '...</p>';
+            } catch (error) {
+                document.getElementById('results').innerHTML += '<p>❌ Login failed: ' + error.message + '</p>';
+            }
+        }
+
+        async function testAPIs() {
+            if (!token) {
+                document.getElementById('results').innerHTML += '<p>❌ Please login first</p>';
+                return;
+            }
+
+            try {
+                // Test User Profile API
+                const profileResponse = await fetch(`${API_BASE}/api/v1/users/me/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const profileData = await profileResponse.json();
+                
+                // Test Plans API  
+                const plansResponse = await fetch(`${API_BASE}/api/v1/users/plans`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const plansData = await plansResponse.json();
+                
+                // Test Usage API
+                const usageResponse = await fetch(`${API_BASE}/api/v1/usage`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const usageData = await usageResponse.json();
+
+                // Display results
+                const results = document.getElementById('results');
+                results.innerHTML += '<h2>API Results:</h2>';
+                results.innerHTML += '<h3>User Profile:</h3><pre>' + JSON.stringify(profileData, null, 2) + '</pre>';
+                results.innerHTML += '<h3>Plans:</h3><pre>' + JSON.stringify(plansData, null, 2) + '</pre>';
+                results.innerHTML += '<h3>Usage:</h3><pre>' + JSON.stringify(usageData, null, 2) + '</pre>';
+                
+                // Test plan matching logic
+                if (profileData.subscription && plansData.length > 0) {
+                    const userPlanId = profileData.subscription.plan_id;
+                    const foundPlan = plansData.find(plan => plan.id === userPlanId);
+                    results.innerHTML += '<h3>Plan Matching:</h3>';
+                    results.innerHTML += '<p>User plan_id: ' + userPlanId + ' (type: ' + typeof userPlanId + ')</p>';
+                    results.innerHTML += '<p>Found plan: ' + (foundPlan ? foundPlan.name : 'NOT FOUND') + '</p>';
+                }
+                
+            } catch (error) {
+                document.getElementById('results').innerHTML += '<p>❌ API test failed: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>
